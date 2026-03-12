@@ -1,0 +1,37 @@
+[package]
+name = "touch_me"
+version = "0.1.0"
+description = "A fast-paced local multiplayer game of tag."
+license = "MIT"
+edition = "2024"
+
+[dependencies]
+macroquad = "0.4.14"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[package.metadata.deb]
+maintainer = "Joris <joris@example.com>"
+copyright = "2026, Joris"
+license-file = "LICENSE"
+depends = "$auto"
+section = "games"
+priority = "optional"
+assets = [
+    ["target/release/touch_me", "usr/bin/touch_me", "755"],
+    ["images/*", "usr/share/touch_me/images/", "644"],
+    ["players/*", "usr/share/touch_me/players/", "644"],
+    ["custom_levels/*", "usr/share/touch_me/custom_levels/", "644"],
+]
+
+[package.metadata.packager]
+name = "Touch Me Reforged"
+identifier = "com.joris.touch-me"
+version = "0.1.0"
+authors = ["Joris"]
+description = "A game of tag"
+category = "Game"
+icons = ["players/red.png"]
+resources = ["images", "players", "custom_levels"]
+
+
