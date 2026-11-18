@@ -1,3 +1,7 @@
+// Release builds on Windows are GUI apps: without this a console window opens
+// next to the game window. Debug builds keep the console so `println!` works.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use macroquad::prelude::*;
 use touch_me::*;
 use touch_me::physics::resolve_tags;

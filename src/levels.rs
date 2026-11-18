@@ -1408,7 +1408,7 @@ pub fn build_map(idx: usize) -> Vec<Platform> {
             p.push(Platform {
                 center: vec2(190.0, 650.0),
                 size: vec2(28.284271, 24.0),
-                angle: 0.7853982,
+                angle: std::f32::consts::FRAC_PI_4,
                 is_jump_pad: false,
                 iced_timer: 0.0,
             });
