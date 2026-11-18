@@ -2,7 +2,13 @@ use macroquad::prelude::*;
 
 // ---------- Collision Math (SAT) ----------
 
-pub fn circle_obb_resolve(c_pos: Vec2, r: f32, p_center: Vec2, p_size: Vec2, p_angle: f32) -> Option<Vec2> {
+pub fn circle_obb_resolve(
+    c_pos: Vec2,
+    r: f32,
+    p_center: Vec2,
+    p_size: Vec2,
+    p_angle: f32,
+) -> Option<Vec2> {
     let s = p_angle.sin();
     let c = p_angle.cos();
 

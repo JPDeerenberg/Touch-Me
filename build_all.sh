@@ -64,9 +64,38 @@ else
     echo "Windows build skipped due to your missing dependencies."
 fi
 
+# Check for MacOS cross-compilation requirements
+echo "--- Checking MacOS Build Requirements ---"
+MAC_BUILD_AVAILABLE=true
+if ! rustup target list | grep -q "x86_64-apple-darwin (installed)"; then
+    echo "Adding MacOS toolchain..."
+    rustup target add x86_64-apple-darwin || true
+fi
+
+if ! command -v osxcross-macports &> /dev/null && ! command -v o64-clang &> /dev/null; then
+    echo "Warning: osxcross is not installed or available in PATH."
+    echo "Cross-compiling to MacOS from Linux requires the macOS SDK and osxcross."
+    echo "Skipping MacOS build locally. (If you run this script on a Mac, we could use native cargo build)."
+    MAC_BUILD_AVAILABLE=false
+fi
+
+if [ "$MAC_BUILD_AVAILABLE" = true ]; then
+    echo "--- Building MacOS Binary ---"
+    cargo build --release --target x86_64-apple-darwin
+    
+    echo "--- Packaging MacOS Application ---"
+    cargo packager --release --target x86_64-apple-darwin --formats app,dmg
+    echo "MacOS package completed."
+else
+    echo "MacOS build skipped due to missing cross-compilation dependencies (osxcross)."
+fi
+
 echo "--- Build Complete ---"
 echo "Linux package: target/debian/"
 if [ "$WINDOWS_BUILD_AVAILABLE" = true ]; then
     # Pointing to the ACTUAL directory where cargo packager put the file
     echo "Windows package: target/x86_64-pc-windows-gnu/release/"
+fi
+if [ "$MAC_BUILD_AVAILABLE" = true ]; then
+    echo "MacOS package: target/x86_64-apple-darwin/release/"
 fi

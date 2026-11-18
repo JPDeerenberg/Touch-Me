@@ -1,5 +1,5 @@
 use macroquad::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // ---------- Controls ----------
 #[allow(dead_code)]
@@ -56,7 +56,7 @@ impl From<PlatformData> for Platform {
 pub struct Platform {
     pub center: Vec2,
     pub size: Vec2,
-    pub angle: f32, // Radians
+    pub angle: f32,        // Radians
     pub is_jump_pad: bool, // High-velocity kinetic repulsion surface
     pub iced_timer: f32,   // AOE Slipping Effect
 }
@@ -66,7 +66,13 @@ impl Platform {
         let center = (start + end) / 2.0;
         let length = (end - start).length().max(10.0);
         let angle = (end.y - start.y).atan2(end.x - start.x);
-        Self { center, size: vec2(length, thickness), angle, is_jump_pad, iced_timer: 0.0 }
+        Self {
+            center,
+            size: vec2(length, thickness),
+            angle,
+            is_jump_pad,
+            iced_timer: 0.0,
+        }
     }
 
     pub fn endpoints(&self) -> (Vec2, Vec2) {
@@ -100,13 +106,13 @@ pub struct Scenery {
 // ---------- Powerups ----------
 #[derive(Clone, Copy, PartialEq)]
 pub enum PowerupKind {
-    Turbo,      // Buff: Speed boost
-    DoubleJump, // Buff: Extra jump
-    Ghost,      // Buff: Untaggable
-    IcePatch,   // Debuff: Slippery
-    Shield,     // Defensive: Absorb tag
-    PortalBlue, // Utility: Linked portal A
-    PortalGreen,// Utility: Linked portal B
+    Turbo,       // Buff: Speed boost
+    DoubleJump,  // Buff: Extra jump
+    Ghost,       // Buff: Untaggable
+    IcePatch,    // Debuff: Slippery
+    Shield,      // Defensive: Absorb tag
+    PortalBlue,  // Utility: Linked portal A
+    PortalGreen, // Utility: Linked portal B
 }
 
 #[derive(Clone, Copy)]
@@ -155,7 +161,7 @@ pub struct Player {
     pub render_angle: f32,
     pub radius: f32,
     pub trail: Vec<Vec2>,
-    
+
     // Powerup states
     pub turbo_timer: f32,
     pub ghost_timer: f32,

@@ -22,6 +22,8 @@ assets = [
     ["images/*", "usr/share/touch_me/images/", "644"],
     ["players/*", "usr/share/touch_me/players/", "644"],
     ["custom_levels/*", "usr/share/touch_me/custom_levels/", "644"],
+    ["assets/logo.png", "usr/share/pixmaps/touch_me.png", "644"],
+    ["assets/touch_me.desktop", "usr/share/applications/touch_me.desktop", "644"],
 ]
 
 [package.metadata.packager]
@@ -31,7 +33,5 @@ version = "0.1.0"
 authors = ["Joris"]
 description = "A game of tag"
 category = "Game"
-icons = ["players/red.png"]
+icons = ["assets/logo.png", "players/red.png"]
 resources = ["images", "players", "custom_levels"]
-
-

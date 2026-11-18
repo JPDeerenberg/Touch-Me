@@ -1,47 +1,10 @@
 use macroquad::prelude::*;
 use touch_me::*;
 use touch_me::physics::resolve_tags;
-use std::path::Path;
 
-fn get_asset_path(path: &str) -> String {
-    if Path::new(path).exists() {
-        path.to_string()
-    } else {
-        #[cfg(target_os = "linux")]
-        {
-            let system_path = format!("/usr/share/touch_me/{}", path);
-            if Path::new(&system_path).exists() {
-                return system_path;
-            }
-        }
-        path.to_string()
-    }
-}
-
-fn all_controls() -> Vec<Controls> {
-    vec![
-        Controls { up: KeyCode::W, left: KeyCode::A, right: KeyCode::D },
-        Controls { up: KeyCode::Up, left: KeyCode::Left, right: KeyCode::Right },
-        Controls { up: KeyCode::I, left: KeyCode::J, right: KeyCode::L },
-        Controls { up: KeyCode::T, left: KeyCode::F, right: KeyCode::H },
-    ]
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-async fn load_fixed_texture(path: &str) -> Result<Texture2D, macroquad::Error> {
-    let actual_path = get_asset_path(path);
-    let img = load_image(&actual_path).await?;
+/// Turn an image into a texture, replacing near-white pixels with
+/// transparency (the source art is drawn on a white background).
+fn keyed_texture(img: &Image) -> Texture2D {
     let mut fixed = img.clone();
     for y in 0..img.height {
         for x in 0..img.width {
@@ -54,31 +17,106 @@ async fn load_fixed_texture(path: &str) -> Result<Texture2D, macroquad::Error> {
     }
     let tex = Texture2D::from_image(&fixed);
     tex.set_filter(FilterMode::Nearest);
-    Ok(tex)
+    tex
 }
 
-#[macroquad::main("Touch Me Reforged")]
+fn texture_from_png(bytes: &[u8]) -> Option<Texture2D> {
+    Image::from_file_with_format(bytes, Some(ImageFormat::Png))
+        .ok()
+        .map(|img| keyed_texture(&img))
+}
+
+fn fallback_texture() -> Texture2D {
+    let tex = Texture2D::from_image(&Image::gen_image_color(16, 16, MAGENTA));
+    tex.set_filter(FilterMode::Nearest);
+    tex
+}
+
+/// Load a game sprite.
+///
+/// A loose file (next to the executable, inside a macOS `.app` bundle or in the
+/// working directory) overrides the copy compiled into the binary. Because the
+/// art is embedded, loading never fails: worst case a magenta placeholder is
+/// returned instead of aborting the game.
+async fn load_game_texture(path: &str) -> Texture2D {
+    for candidate in touch_me::assets::asset_candidates(path) {
+        if !candidate.is_file() {
+            continue;
+        }
+        let Some(literal) = candidate.to_str() else { continue };
+        if let Ok(img) = load_image(literal).await {
+            return keyed_texture(&img);
+        }
+    }
+
+    touch_me::assets::embedded(path)
+        .and_then(texture_from_png)
+        .unwrap_or_else(fallback_texture)
+}
+
+fn all_controls() -> Vec<Controls> {
+    vec![
+        Controls { up: KeyCode::W, left: KeyCode::A, right: KeyCode::D },
+        Controls { up: KeyCode::Up, left: KeyCode::Left, right: KeyCode::Right },
+        Controls { up: KeyCode::I, left: KeyCode::J, right: KeyCode::L },
+        Controls { up: KeyCode::T, left: KeyCode::F, right: KeyCode::H },
+    ]
+}
+
+/// Fallback spawn points, used when a map (usually a hand-made custom level)
+/// does not define enough spawns for the selected number of players.
+fn default_spawns() -> [Vec2; 4] {
+    [
+        vec2(REF_W * 0.1, REF_H * 0.3),
+        vec2(REF_W * 0.9, REF_H * 0.3),
+        vec2(REF_W * 0.1, REF_H * 0.7),
+        vec2(REF_W * 0.9, REF_H * 0.7),
+    ]
+}
+
+/// Guarantee at least `count` spawn points so every selected player can join.
+fn ensure_spawns(mut spawns: Vec<Vec2>, count: usize) -> Vec<Vec2> {
+    for fallback in default_spawns() {
+        if spawns.len() >= count {
+            break;
+        }
+        spawns.push(fallback);
+    }
+    spawns
+}
+
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Touch Me Reforged".to_owned(),
+        window_width: REF_W as i32,
+        window_height: REF_H as i32,
+        window_resizable: true,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     // Enable linear filtering for smoother text rendering
     set_default_filter_mode(FilterMode::Linear);
     
     // Load player textures with chroma-keying
     let player_textures = [
-        load_fixed_texture("players/red.png").await,
-        load_fixed_texture("players/blue.png").await,
-        load_fixed_texture("players/green.png").await,
-        load_fixed_texture("players/yellow.png").await,
+        load_game_texture("players/red.png").await,
+        load_game_texture("players/blue.png").await,
+        load_game_texture("players/green.png").await,
+        load_game_texture("players/yellow.png").await,
     ];
 
     // Load powerup textures
     let pu_textures = [
-        load_fixed_texture("images/sneakers.png").await,
-        load_fixed_texture("images/cloud.png").await,
-        load_fixed_texture("images/ghost.png").await,
-        load_fixed_texture("images/ice.png").await,
-        load_fixed_texture("images/shield.png").await,
-        load_fixed_texture("images/portal blue.png").await,
-        load_fixed_texture("images/portal green.png").await,
+        load_game_texture("images/sneakers.png").await,
+        load_game_texture("images/cloud.png").await,
+        load_game_texture("images/ghost.png").await,
+        load_game_texture("images/ice.png").await,
+        load_game_texture("images/shield.png").await,
+        load_game_texture("images/portal blue.png").await,
+        load_game_texture("images/portal green.png").await,
     ];
     
     let mut state = GameState::Menu;
@@ -88,6 +126,7 @@ async fn main() {
     let mut timer_secs: f32 = 60.0;
     let mut time_left: f32 = 0.0;
     let mut spawn_timer = 0.0;
+    let mut portal_spawn_timer = 0.0;
     let mut players: Vec<Player> = Vec::new();
     let mut platforms: Vec<Platform> = Vec::new();
     let mut scenery: Vec<Scenery> = Vec::new();
@@ -107,6 +146,10 @@ async fn main() {
     let mut export_message_timer = 0.0;
     
     let mut powerups_enabled = false;
+    
+    // Dynamic camera state
+    let mut cam_target = vec2(REF_W / 2.0, REF_H / 2.0);
+    let mut cam_zoom = 1.0;
 
     loop {
         // --- Virtual Resolution Setup ---
@@ -122,22 +165,89 @@ async fn main() {
             (sw, vh, 0.0, (sh - vh) / 2.0)
         };
 
-        let mut camera = Camera2D::from_display_rect(Rect::new(0.0, REF_H, REF_W, -REF_H));
-        camera.viewport = Some((vx as i32, vy as i32, vw as i32, vh as i32));
+        let mut ui_camera = Camera2D::from_display_rect(Rect::new(0.0, REF_H, REF_W, -REF_H));
+        ui_camera.viewport = Some((vx as i32, vy as i32, vw as i32, vh as i32));
 
         let (smx, smy) = mouse_position();
-        let mpos = camera.screen_to_world(vec2(smx, smy));
+        let mpos = ui_camera.screen_to_world(vec2(smx, smy));
         
         set_default_camera();
+        // Base the world camera on the virtual resolution viewport
+        let mut world_camera = Camera2D::from_display_rect(Rect::new(0.0, REF_H, REF_W, -REF_H));
+        world_camera.viewport = Some((vx as i32, vy as i32, vw as i32, vh as i32));
+        
         clear_background(BLACK);
         
-        set_camera(&camera);
-        let current_theme = &MAP_THEMES[theme_idx.min(4)];
-        
+        // Update camera interpolations
         let dt = get_frame_time().min(0.033);
+        let lerp_speed = 1.0 * dt; // Reduced further for very smooth tracking
+        
+        match state {
+            GameState::Playing | GameState::Paused => {
+                let mut min_x = f32::MAX;
+                let mut max_x = f32::MIN;
+                let mut min_y = f32::MAX;
+                let mut max_y = f32::MIN;
+                
+                if !players.is_empty() {
+                    for p in &players {
+                        min_x = min_x.min(p.pos.x);
+                        max_x = max_x.max(p.pos.x);
+                        min_y = min_y.min(p.pos.y);
+                        max_y = max_y.max(p.pos.y);
+                    }
+                    
+                    // Add padding to bounding box
+                    let pad = 200.0;
+                    min_x -= pad; max_x += pad;
+                    min_y -= pad; max_y += pad;
+                    
+                    let dx = max_x - min_x;
+                    let dy = max_y - min_y;
+                    
+                    // Target zoom to fit all players
+                    let zoom_x = REF_W / dx;
+                    let zoom_y = REF_H / dy;
+                    let mut target_zoom = zoom_x.min(zoom_y);
+                    target_zoom = target_zoom.clamp(1.0, 2.0); // Never zoom out more than whole map (1.0), or in more than 2x
+                    
+                    cam_zoom = cam_zoom + (target_zoom - cam_zoom) * lerp_speed;
+                    
+                    let target_cx = (min_x + max_x) / 2.0;
+                    let target_cy = (min_y + max_y) / 2.0;
+                    
+                    // Constrain center so camera doesn't show out of bounds
+                    // At zoom 1.0, view width is REF_W. At zoom 2.0, it's REF_W / 2.0.
+                    let view_w = REF_W / cam_zoom;
+                    let view_h = REF_H / cam_zoom;
+                    
+                    let constrained_cx = target_cx.clamp(view_w / 2.0, REF_W - view_w / 2.0);
+                    let constrained_cy = target_cy.clamp(view_h / 2.0, REF_H - view_h / 2.0);
+                    
+                    cam_target.x = cam_target.x + (constrained_cx - cam_target.x) * lerp_speed;
+                    cam_target.y = cam_target.y + (constrained_cy - cam_target.y) * lerp_speed;
+                }
+            }
+            _ => {
+                // For Menus, GameOver, Editor, revert to standard centered view
+                cam_zoom = cam_zoom + (1.0 - cam_zoom) * lerp_speed;
+                cam_target.x = cam_target.x + (REF_W / 2.0 - cam_target.x) * lerp_speed;
+                cam_target.y = cam_target.y + (REF_H / 2.0 - cam_target.y) * lerp_speed;
+            }
+        }
+        
+        // Apply target and zoom to world camera
+        // Macroquad zoom is a vec2 where (1, 1) is screen space.
+        // We need to map our zoom (1.0 to 2.0) taking into account the virtual resolution rect.
+        // The virtual resolution is set via `from_display_rect`.
+        world_camera.target = cam_target;
+        world_camera.zoom = vec2(2.0 * cam_zoom / REF_W, 2.0 * cam_zoom / REF_H); // Fixed Y inversion by making it positive
+
+        let current_theme = &MAP_THEMES[theme_idx.min(4)];
 
         match state {
             GameState::Menu => {
+                set_camera(&ui_camera);
                 draw_gradient(current_theme.bg_top, current_theme.bg_bot);
                 draw_particles(map_idx, get_time(), current_theme.particle_col);
 
@@ -186,7 +296,7 @@ async fn main() {
                 if !custom_levels.is_empty() {
                     let cl = measure_text("Saved Custom Levels", None, 24, 1.0);
                     draw_text("Saved Custom Levels", cx - cl.width / 2.0, 280.0, 24.0, current_theme.text_col);
-                    let cmw = 100.0; let cmgap = 8.0; let edit_btn_w = 28.0;
+                    let cmw = 100.0; let cmgap = 8.0; let edit_btn_w = 44.0;
                     let max_custom_per_row = 4;
                     for (i, level) in custom_levels.iter().enumerate().take(8) {
                         let row = i / max_custom_per_row;
@@ -196,13 +306,20 @@ async fn main() {
                         let cy_btn = 305.0 + row as f32 * 43.0;
                         
                         // Main level button
-                        if draw_m3_btn(mpos, cx_btn, cy_btn, cmw, 35.0, level, map_idx == 6 + i, 16.0, current_theme) {
+                        // (macroquad's built-in font has no pencil glyph, and long
+                        // file names would spill out of the button, so shorten them)
+                        let label = if level.chars().count() > 12 {
+                            format!("{}..", level.chars().take(10).collect::<String>())
+                        } else {
+                            level.clone()
+                        };
+                        if draw_m3_btn(mpos, cx_btn, cy_btn, cmw, 35.0, &label, map_idx == 6 + i, 16.0, current_theme) {
                             map_idx = 6 + i;
                         }
                         
-                        // Edit button (pencil icon)
+                        // Edit button
                         let edit_x = cx_btn + cmw + 4.0;
-                        if draw_m3_btn(mpos, edit_x, cy_btn, edit_btn_w, 35.0, "✏", false, 16.0, current_theme) {
+                        if draw_m3_btn(mpos, edit_x, cy_btn, edit_btn_w, 35.0, "Edit", false, 14.0, current_theme) {
                             // Load this custom level into the editor
                             if let Ok((loaded_plats, loaded_spawns)) = import_level(&custom_levels[i]) {
                                 editor_plats = loaded_plats;
@@ -259,14 +376,7 @@ async fn main() {
                         if let Ok((loaded_platforms, loaded_spawns)) = import_level(&custom_levels[map_idx - 6]) {
                             platforms = loaded_platforms;
                             scenery = build_scenery(4, &platforms);
-                            editor_spawns = if loaded_spawns.is_empty() {
-                                vec![
-                                    vec2(REF_W * 0.1, REF_H * 0.3), vec2(REF_W * 0.9, REF_H * 0.3),
-                                    vec2(REF_W * 0.1, REF_H * 0.7), vec2(REF_W * 0.9, REF_H * 0.7),
-                                ]
-                            } else {
-                                loaded_spawns
-                            };
+                            editor_spawns = loaded_spawns;
                         } else {
                             platforms = build_map(0);
                             scenery = build_scenery(0, &platforms);
@@ -275,6 +385,12 @@ async fn main() {
                         platforms = build_map(0);
                         scenery = build_scenery(0, &platforms);
                     }
+
+                    // Never start a round with fewer spawns than players: a custom
+                    // level without spawn points used to launch a game with nobody
+                    // in it (unplayable, timer still running).
+                    editor_spawns = ensure_spawns(editor_spawns, nplayers);
+
                     let ctrls = all_controls();
                     players.clear();
                     for (i, c) in ctrls.into_iter().enumerate() {
@@ -282,19 +398,27 @@ async fn main() {
                         players.push(Player::new(editor_spawns[i], PLAYER_COLORS[i], c, PLAYER_RADIUS));
                     }
                     if !players.is_empty() {
-                        players[0].is_it = true;
+                        let it_idx = rand::gen_range(0, players.len());
+                        players[it_idx].is_it = true;
                     }
 
                     // Populate Powerups (Empty initially, dynamic spawn will handle it)
                     powerups.clear();
                     spawn_timer = 2.0; // Wait 2 seconds before first spawn
+                    portal_spawn_timer = 1.0; // Wait 1 second before first portal spawn
 
                     time_left = timer_secs;
+                    
+                    // Snapping camera immediately on start
+                    cam_zoom = 1.0;
+                    cam_target = vec2(REF_W / 2.0, REF_H / 2.0);
+                    
                     state = GameState::Playing;
                 }
             }
 
             GameState::Playing | GameState::Paused => {
+                set_camera(&world_camera);
                 // Background
                 draw_gradient(current_theme.bg_top, current_theme.bg_bot);
                 draw_particles(map_idx, get_time(), current_theme.particle_col);
@@ -313,16 +437,14 @@ async fn main() {
                 
                 // Draw Players
                 for (i, p) in players.iter().enumerate() {
-                    let tex = if i < player_textures.len() {
-                        player_textures[i].as_ref().ok()
-                    } else {
-                        None
-                    };
+                    let tex = player_textures.get(i);
                     p.draw(tex);
                 }
                 
                 // Draw Foreground Scenery (Hiding spots)
                 for s in &scenery { if s.fg { s.draw(current_theme); } }
+
+                set_camera(&ui_camera);
 
                 let tt = format!("{}s", time_left.ceil() as i32);
                 let ttd = measure_text(&tt, None, 48, 1.0);
@@ -390,6 +512,7 @@ async fn main() {
                                                 pu_to_remove.push(k);
                                             }
                                         }
+                                        portal_spawn_timer = 10.0;
                                     } else {
                                         // Collection feedback
                                         for _ in 0..10 {
@@ -452,15 +575,15 @@ async fn main() {
                             }
                         }
 
-                        // Dynamic Spawning
+                        // Powerup Spawning
                         if powerups_enabled {
                             spawn_timer -= dt;
                             // Only spawn if active powerups < 3
-                            let active_count = powerups.iter().filter(|p| p.active).count();
+                            let active_count = powerups.iter().filter(|p| p.active && p.kind != PowerupKind::PortalBlue && p.kind != PowerupKind::PortalGreen).count();
                             if spawn_timer <= 0.0 && active_count < 3 {
                                 let kinds = [
                                     PowerupKind::Turbo, PowerupKind::DoubleJump, PowerupKind::Ghost,
-                                    PowerupKind::IcePatch, PowerupKind::Shield, PowerupKind::PortalBlue
+                                    PowerupKind::IcePatch, PowerupKind::Shield
                                 ];
                                 let kind = kinds[rand::gen_range(0, kinds.len())];
                                 
@@ -477,23 +600,38 @@ async fn main() {
                                     let p1_idx = valid_plats[rand::gen_range(0, valid_plats.len())];
                                     let p1 = &platforms[p1_idx];
                                     let pos1 = p1.center + vec2(0.0, -25.0);
-                                    
-                                    if kind == PowerupKind::PortalBlue {
-                                        if valid_plats.len() > 1 {
-                                            let mut p2_idx = p1_idx;
-                                            while p2_idx == p1_idx {
-                                                p2_idx = valid_plats[rand::gen_range(0, valid_plats.len())];
-                                            }
-                                            let p2 = &platforms[p2_idx];
-                                            let pos2 = p2.center + vec2(0.0, -25.0);
-                                            powerups.push(Powerup { pos: pos1, kind: PowerupKind::PortalBlue, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
-                                            powerups.push(Powerup { pos: pos2, kind: PowerupKind::PortalGreen, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
-                                        }
-                                    } else {
-                                        powerups.push(Powerup { pos: pos1, kind, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
-                                    }
+                                    powerups.push(Powerup { pos: pos1, kind, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
                                 }
                                 spawn_timer = rand::gen_range(8.0, 15.0); // Slower spawn
+                            }
+                        }
+
+                        // Portal Spawning (Independent of powerups_enabled)
+                        let active_portals = powerups.iter().filter(|p| p.active && (p.kind == PowerupKind::PortalBlue || p.kind == PowerupKind::PortalGreen)).count();
+                        if active_portals == 0 {
+                            portal_spawn_timer -= dt;
+                            if portal_spawn_timer <= 0.0 {
+                                let mut valid_plats: Vec<usize> = Vec::new();
+                                for (idx, p) in platforms.iter().enumerate() {
+                                    if idx > 3 && p.center.y > 120.0 && p.center.y < 700.0 && p.angle.abs() < 0.8 && !p.is_jump_pad {
+                                        valid_plats.push(idx);
+                                    }
+                                }
+
+                                if valid_plats.len() > 1 {
+                                    let p1_idx = valid_plats[rand::gen_range(0, valid_plats.len())];
+                                    let mut p2_idx = p1_idx;
+                                    while p2_idx == p1_idx {
+                                        p2_idx = valid_plats[rand::gen_range(0, valid_plats.len())];
+                                    }
+                                    let p1 = &platforms[p1_idx];
+                                    let pos1 = p1.center + vec2(0.0, -25.0);
+                                    let p2 = &platforms[p2_idx];
+                                    let pos2 = p2.center + vec2(0.0, -25.0);
+                                    powerups.push(Powerup { pos: pos1, kind: PowerupKind::PortalBlue, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
+                                    powerups.push(Powerup { pos: pos2, kind: PowerupKind::PortalGreen, active: true, respawn_timer: 0.0, spawn_in_timer: 0.5 });
+                                }
+                                portal_spawn_timer = 10.0; // Reset for next wait once these are gone
                             }
                         }
 
@@ -537,6 +675,7 @@ async fn main() {
             }
 
             GameState::GameOver { loser } => {
+                set_camera(&ui_camera);
                 draw_gradient(current_theme.bg_top, current_theme.bg_bot);
                 draw_particles(map_idx, get_time(), current_theme.particle_col);
 
@@ -554,26 +693,34 @@ async fn main() {
                 
                 // Draw loser player texture
                 let size = PLAYER_RADIUS * 2.0;
-                if loser < player_textures.len() {
-                    if let Ok(tex) = &player_textures[loser] {
-                        draw_texture_ex(tex, cx - size/2.0, cy + 50.0 - size/2.0, WHITE, DrawTextureParams {
-                            dest_size: Some(vec2(size, size)),
-                            ..Default::default()
-                        });
-                        draw_rectangle_lines(cx - size/2.0 - 3.0, cy + 50.0 - size/2.0 - 3.0, size + 6.0, size + 6.0, 4.0, WHITE);
-                    }
+                if let Some(tex) = player_textures.get(loser) {
+                    draw_texture_ex(tex, cx - size/2.0, cy + 50.0 - size/2.0, WHITE, DrawTextureParams {
+                        dest_size: Some(vec2(size, size)),
+                        ..Default::default()
+                    });
+                    draw_rectangle_lines(cx - size/2.0 - 3.0, cy + 50.0 - size/2.0 - 3.0, size + 6.0, size + 6.0, 4.0, WHITE);
                 }
 
                 if draw_m3_btn(mpos, cx - 180.0, cy + 120.0, 160.0, 55.0, "Play Again", false, 26.0, current_theme) {
-                    let spawns = [
-                        vec2(REF_W * 0.1, REF_H * 0.3), vec2(REF_W * 0.9, REF_H * 0.3),
-                        vec2(REF_W * 0.1, REF_H * 0.7), vec2(REF_W * 0.9, REF_H * 0.7),
-                    ];
+                    // Respawn on the current map's own spawn points, not on fixed
+                    // screen corners (which could bury players inside platforms).
+                    let spawns = ensure_spawns(editor_spawns.clone(), players.len());
                     for (i, p) in players.iter_mut().enumerate() {
                         p.pos = spawns[i]; p.vel = Vec2::ZERO; p.trail.clear();
                         p.is_it = false; p.on_ground = false; p.tag_timer = 0.0;
+                        p.turbo_timer = 0.0; p.ghost_timer = 0.0; p.extra_jumps = 0;
+                        p.shield_active = false; p.shield_timer = 0.0; p.slip_timer = 0.0;
+                        p.teleport_timer = 0.0; p.coyote_timer = 0.0;
                     }
-                    players[0].is_it = true;
+                    if !players.is_empty() {
+                        let it_idx = rand::gen_range(0, players.len());
+                        players[it_idx].is_it = true;
+                    }
+                    // Clear leftover powerups and particles from the previous round
+                    powerups.clear();
+                    particles.clear();
+                    spawn_timer = 2.0;
+                    portal_spawn_timer = 1.0;
                     time_left = timer_secs;
                     state = GameState::Playing;
                 }
@@ -582,9 +729,8 @@ async fn main() {
                 }
             }
 
-// Replace your GameState::Editor match block in main.rs with this:
-
             GameState::Editor => {
+                set_camera(&ui_camera);
                 draw_gradient(current_theme.bg_top, current_theme.bg_bot);
                 let edit_scenery = build_scenery(4, &editor_plats);
                 
@@ -653,17 +799,25 @@ async fn main() {
                 }
                 
                 if draw_m3_btn(mpos, 510.0, tb_y, 100.0, 40.0, "Export", false, 20.0, current_theme) {
-                    let level_name = if let Some(idx) = editing_custom_level {
-                        custom_levels[idx].clone()
-                    } else {
-                        let level_num = custom_levels.len() + 1;
-                        format!("custom_{}", level_num)
+                    // Pick a name that does not clobber an existing level.
+                    let level_name = match editing_custom_level.and_then(|idx| custom_levels.get(idx).cloned()) {
+                        Some(name) => name,
+                        None => {
+                            editing_custom_level = None;
+                            let mut n = custom_levels.len() + 1;
+                            while custom_levels.iter().any(|l| *l == format!("custom_{}", n)) {
+                                n += 1;
+                            }
+                            format!("custom_{}", n)
+                        }
                     };
                     match export_level(&editor_plats, &editor_spawns, &level_name) {
                         Ok(_) => {
                             export_message = "Level exported!";
                             export_message_timer = 2.0;
                             custom_levels = list_custom_levels();
+                            // Keep editing this level so the next export overwrites it.
+                            editing_custom_level = custom_levels.iter().position(|l| *l == level_name);
                         }
                         Err(_) => {
                             export_message = "Export failed!";
