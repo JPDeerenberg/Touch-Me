@@ -57,7 +57,7 @@ jobs:
           ls -la dist
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: touch-me-linux-x86_64
           path: dist/*.tar.gz
@@ -90,27 +90,31 @@ jobs:
           Get-ChildItem dist
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: touch-me-windows-x86_64
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 30
 
-  # One macOS job builds both architectures: the arm64 runner can cross-compile
-  # to x86_64 with the same SDK, and it avoids depending on the legacy Intel
-  # runner pool.
+  # Both macOS architectures build natively (arm64 on Apple Silicon, x86_64 on
+  # the Intel image) and use explicit image labels so each one draws from its
+  # own runner pool instead of the shared `macos-latest` queue.
   macos:
-    name: macOS (arm64 + x86_64)
-    runs-on: macos-latest
+    name: macOS (${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: aarch64-apple-darwin
+          - arch: arm64
+            os: macos-15
+            target: aarch64-apple-darwin
             artifact: touch-me-macos-arm64
-          - target: x86_64-apple-darwin
+          - arch: x86_64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
             artifact: touch-me-macos-x86_64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
@@ -188,7 +192,7 @@ jobs:
           TARGET: ${{ matrix.target }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
           path: dist/*.tar.gz
@@ -204,7 +208,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true
