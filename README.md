@@ -1,5 +1,9 @@
 # Touch Me Reforged
 
+[![Build executables](https://github.com/JPDeerenberg/Touch-Me/actions/workflows/build.yml/badge.svg)](https://github.com/JPDeerenberg/Touch-Me/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/JPDeerenberg/Touch-Me)](https://github.com/JPDeerenberg/Touch-Me/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A fast-paced **local multiplayer game of tag**. One player is *IT* — touch someone
 else before the timer runs out, or you lose. Built with Rust and
 [macroquad](https://github.com/not-fl3/macroquad).
@@ -8,16 +12,17 @@ else before the timer runs out, or you lose. Built with Rust and
 
 ## Download
 
-Prebuilt executables for every platform are attached to each
-[release](https://github.com/JPDeerenberg/Touch-Me/releases) and are also produced
-by the *Build executables* workflow on every push:
+Grab the newest build from the [releases page](https://github.com/JPDeerenberg/Touch-Me/releases/latest):
 
-| Platform | Artifact |
+| Platform | Direct download |
 | --- | --- |
-| Linux (x86_64) | `touch-me-linux-x86_64.tar.gz` |
-| Windows (x86_64) | `touch-me-windows-x86_64.zip` |
-| macOS (Apple Silicon) | `touch-me-macos-arm64.tar.gz` |
-| macOS (Intel) | `touch-me-macos-x86_64.tar.gz` |
+| Linux (x86_64) | [touch-me-linux-x86_64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-linux-x86_64.tar.gz) |
+| Windows (x86_64) | [touch-me-windows-x86_64.zip](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-windows-x86_64.zip) |
+| macOS (Apple Silicon) | [touch-me-macos-arm64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-arm64.tar.gz) |
+| macOS (Intel) | [touch-me-macos-x86_64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-x86_64.tar.gz) |
+
+Every push also produces the same binaries as workflow artifacts on the
+[Actions tab](https://github.com/JPDeerenberg/Touch-Me/actions/workflows/build.yml).
 
 The binaries are **self-contained**: all sprites are compiled into the executable,
 so you can unpack them anywhere and just run `touch_me` (`.exe` on Windows).
