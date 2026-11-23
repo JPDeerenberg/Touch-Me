@@ -1,6 +1,6 @@
 [package]
 name = "touch_me"
-version = "0.1.0"
+version = "0.1.1"
 description = "A fast-paced local multiplayer game of tag."
 license = "MIT"
 edition = "2024"
@@ -29,7 +29,7 @@ assets = [
 [package.metadata.packager]
 name = "Touch Me Reforged"
 identifier = "com.joris.touch-me"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Joris"]
 description = "A game of tag"
 category = "Game"
