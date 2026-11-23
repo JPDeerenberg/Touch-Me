@@ -14,12 +14,20 @@ else before the timer runs out, or you lose. Built with Rust and
 
 Grab the newest build from the [releases page](https://github.com/JPDeerenberg/Touch-Me/releases/latest):
 
-| Platform | Direct download |
+| Platform | Downloads |
 | --- | --- |
-| Linux (x86_64) | [touch-me-linux-x86_64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-linux-x86_64.tar.gz) |
-| Windows (x86_64) | [touch-me-windows-x86_64.zip](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-windows-x86_64.zip) |
-| macOS (Apple Silicon) | [touch-me-macos-arm64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-arm64.tar.gz) |
-| macOS (Intel) | [touch-me-macos-x86_64.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-x86_64.tar.gz) |
+| Linux (x86_64) | [binary](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-linux-x86_64) · [.deb](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-linux-x86_64.deb) · [.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-linux-x86_64.tar.gz) |
+| Windows (x86_64) | [.exe](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-windows-x86_64.exe) · [.zip](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-windows-x86_64.zip) |
+| macOS (Apple Silicon) | [binary](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-arm64) · [.dmg](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-arm64.dmg) · [.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-arm64.tar.gz) |
+| macOS (Intel) | [binary](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-x86_64) · [.dmg](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-x86_64.dmg) · [.tar.gz](https://github.com/JPDeerenberg/Touch-Me/releases/latest/download/touch-me-macos-x86_64.tar.gz) |
+
+The bare Linux and macOS downloads are the executable itself; make it runnable
+with `chmod +x <file>` after downloading. On Linux the `.deb` installs the game,
+its desktop entry and the artwork system-wide:
+
+```bash
+sudo apt install ./touch-me-linux-x86_64.deb
+```
 
 Every push also produces the same binaries as workflow artifacts on the
 [Actions tab](https://github.com/JPDeerenberg/Touch-Me/actions/workflows/build.yml).
@@ -74,9 +82,10 @@ whole dance for you.
 ## CI
 
 `.github/workflows/build.yml` builds a release binary for Linux, Windows and macOS
-(both architectures), bundles each one and uploads it as a workflow artifact.
-Pushing a tag such as `v0.1.0` additionally publishes a GitHub release with all
-artifacts attached.
+(both architectures), then publishes the bare executables (Linux and macOS
+binaries, Windows `.exe`), a Linux `.deb`, macOS `.dmg` images and the tarball/zip
+bundles. Every push uploads them as workflow artifacts; pushing a tag such as
+`v0.1.2` additionally publishes a GitHub release with all of them attached.
 
 ## License
 

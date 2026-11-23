@@ -48,19 +48,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          stage="dist/${APP_NAME}"
+          mkdir -p dist build
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          stage="build/${APP_NAME}"
           mkdir -p "$stage"
           cp "target/release/${BIN_NAME}" "$stage/"
           cp LICENSE README.md "$stage/" 2>/dev/null || true
           chmod +x "$stage/${BIN_NAME}"
-          tar -czf "dist/touch-me-linux-x86_64.tar.gz" -C dist "${APP_NAME}"
+          tar -czf "dist/touch-me-linux-x86_64.tar.gz" -C build "${APP_NAME}"
+
+          # Bare executable, for people who just want the binary.
+          cp "target/release/${BIN_NAME}" "dist/touch-me-linux-x86_64"
+          chmod +x "dist/touch-me-linux-x86_64"
+
+          # .deb package (kept in sync with [package.metadata.deb]).
+          deb="build/touch-me_${version}_amd64"
+          mkdir -p "$deb/DEBIAN" "$deb/usr/bin" "$deb/usr/share/touch_me" \
+                   "$deb/usr/share/pixmaps" "$deb/usr/share/applications" \
+                   "$deb/usr/share/doc/touch-me"
+          install -m 755 "target/release/${BIN_NAME}" "$deb/usr/bin/${BIN_NAME}"
+          cp -r images players "$deb/usr/share/touch_me/"
+          mkdir -p "$deb/usr/share/touch_me/custom_levels"
+          cp assets/logo.png "$deb/usr/share/pixmaps/touch_me.png"
+          cp assets/touch_me.desktop "$deb/usr/share/applications/"
+          cp LICENSE "$deb/usr/share/doc/touch-me/copyright"
+          cat > "$deb/DEBIAN/control" <<CONTROL
+          Package: touch-me
+          Version: ${version}
+          Section: games
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Joris <joris@example.com>
+          Depends: libc6, libgcc-s1, libx11-6, libxi6, libgl1
+          Description: A fast-paced local multiplayer game of tag.
+          CONTROL
+          dpkg-deb --build --root-owner-group "$deb" "dist/touch-me-linux-x86_64.deb"
+          dpkg-deb --info "dist/touch-me-linux-x86_64.deb" >/dev/null
           ls -la dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: touch-me-linux-x86_64
-          path: dist/*.tar.gz
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -82,18 +112,20 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $stage = "dist/$env:APP_NAME"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $stage = "build/$env:APP_NAME"
+          New-Item -ItemType Directory -Force -Path dist, $stage | Out-Null
           Copy-Item "target/release/$env:BIN_NAME.exe" $stage
           Copy-Item LICENSE, README.md $stage -ErrorAction SilentlyContinue
           Compress-Archive -Path $stage -DestinationPath "dist/touch-me-windows-x86_64.zip"
+          # Bare executable, for people who just want the .exe.
+          Copy-Item "target/release/$env:BIN_NAME.exe" "dist/touch-me-windows-x86_64.exe"
           Get-ChildItem dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: touch-me-windows-x86_64
-          path: dist/*.zip
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -135,7 +167,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          app="dist/${APP_NAME}.app"
+          mkdir -p dist build
+          app="build/${APP_NAME}.app"
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
           cp "target/${TARGET}/release/${BIN_NAME}" "$app/Contents/MacOS/${BIN_NAME}"
@@ -184,7 +217,18 @@ jobs:
           # Ad-hoc signature: unsigned .app bundles are refused by macOS.
           codesign --force --deep --sign - "$app" || true
 
-          tar -czf "dist/${{ matrix.artifact }}.tar.gz" -C dist "${APP_NAME}.app"
+          # Bare executable, for terminal use.
+          cp "target/${TARGET}/release/${BIN_NAME}" "dist/${{ matrix.artifact }}"
+          chmod +x "dist/${{ matrix.artifact }}"
+
+          # Disk image containing the .app, ready to drag into /Applications.
+          dmg_root="build/dmg"
+          mkdir -p "$dmg_root"
+          ditto "$app" "$dmg_root/${APP_NAME}.app"
+          hdiutil create -volname "${APP_NAME}" -srcfolder "$dmg_root" -ov -format UDZO \
+            "dist/${{ matrix.artifact }}.dmg"
+
+          tar -czf "dist/${{ matrix.artifact }}.tar.gz" -C build "${APP_NAME}.app"
           ls -la dist
         env:
           APP_NAME: Touch Me Reforged
@@ -195,7 +239,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
-          path: dist/*.tar.gz
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
